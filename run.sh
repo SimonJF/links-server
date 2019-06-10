@@ -1,2 +1,2 @@
 #! /usr/bin/env bash
-./_build/default/src/bin/eval_links.exe
+./_build/default/src/bin/server.exe

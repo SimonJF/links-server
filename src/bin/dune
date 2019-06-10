@@ -1,3 +1,11 @@
+; (executable
+;   (name eval_links)
+;   (libraries dynlink links.core))
+
 (executable
-  (name eval_links)
-  (libraries dynlink links.core))
+  (name server)
+  (libraries dynlink links.core lwt lwt.unix logs logs.lwt))
+
+(env
+  (dev
+    (flags (:standard -warn-error -A))))

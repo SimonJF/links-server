@@ -54,7 +54,7 @@ B /home/simon/.opam/default/lib/uri/sexp
 B /home/simon/.opam/default/lib/websocket
 B /home/simon/.opam/default/lib/websocket-lwt/cohttp
 B /home/simon/.opam/default/lib/yojson
-B ../../_build/default/src/bin/.eval_links.eobjs/byte
+B ../../_build/default/src/bin/.server.eobjs/byte
 S /home/simon/.opam/default/lib/ANSITerminal
 S /home/simon/.opam/default/lib/astring
 S /home/simon/.opam/default/lib/base
@@ -111,4 +111,4 @@ S /home/simon/.opam/default/lib/websocket
 S /home/simon/.opam/default/lib/websocket-lwt/cohttp
 S /home/simon/.opam/default/lib/yojson
 S .
-FLG -w @a-4-29-40-41-42-44-45-48-58-59-60-40 -strict-sequence -strict-formats -short-paths -keep-locs
+FLG -w @a-4-29-40-41-42-44-45-48-58-59-60-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A

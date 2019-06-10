@@ -4,8 +4,8 @@ open Links_core.Sugartypes
 
 (* Parses a string and returns a Links expression *)
 (* TODO: Exception handling *)
-let parse =
-  Parse.parse_string Parse.interactive
+let parse str =
+  Parse.parse_string Parse.interactive str
 
 (* Takes a REPL string and produces a pair of perhaps a Links value (in the case of an expression)
  * and updated environments. *)
