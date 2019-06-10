@@ -1,0 +1,3 @@
+(executable
+  (name eval_links)
+  (libraries dynlink links.core))
