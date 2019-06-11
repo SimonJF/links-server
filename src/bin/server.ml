@@ -1,21 +1,21 @@
 open Lwt
 open Eval_links
+open Links_core
 
-(* Shared mutable counter *)
-let counter = ref 0
 
 let listen_address = Unix.inet_addr_loopback
-let port = 9000
+let port = 9003
 let backlog = 10
+let init = Eval_links.init ()
 
+let handle_message msg env =
+  let result, new_env = Eval_links.evaluate msg env in
+  match result with
+  | Some exp -> (("   " ^ (Value.string_of_value exp)), new_env)
+  | None -> ("   Valid Definition", new_env)
+        
 
-let handle_message msg =
-    match msg with
-    | "read" -> string_of_int !counter
-    | "inc"  -> counter := !counter + 1; "Counter has been incremented"
-    | _      -> "Unknown command"
-
-let rec handle_connection ic oc () =
+let rec handle_connection ic oc env () =
   let read = Lwt_io.read_line_opt ic in (* Type: Lwt.t (string option)  *)
   let write data = Lwt_io.write_line oc data in
 
@@ -23,16 +23,16 @@ let rec handle_connection ic oc () =
   (fun msg ->
       match msg with
       | Some msg ->
-          let reply = handle_message msg in
+          let reply, new_env = handle_message msg env in
           write reply >>=
-          handle_connection ic oc
+          handle_connection ic oc new_env
       | None -> Logs_lwt.info (fun m -> m "Connection closed") >>= return)
 
 let accept_connection conn =
     let fd, _ = conn in
     let ic = Lwt_io.of_fd ~mode:Lwt_io.Input fd in
     let oc = Lwt_io.of_fd ~mode:Lwt_io.Output fd in
-    Lwt.on_failure (handle_connection ic oc ()) (fun e -> Logs.err (fun m -> m "%s" (Printexc.to_string e) ));
+    Lwt.on_failure (handle_connection ic oc init ()) (fun e -> Logs.err (fun m -> m "%s"  (Printexc.to_string e) ));
     Logs_lwt.info (fun m -> m "New connection") >>= return
 
 let create_socket () =
