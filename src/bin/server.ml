@@ -4,15 +4,31 @@ open Links_core
 
 
 let listen_address = Unix.inet_addr_loopback
-let port = 9003
+let port = 9000
 let backlog = 10
 let init = Eval_links.init ()
 
+(* eval created from result of Eval_links.evaluate *)
+type eval =
+  | Expression of (Value.t * Driver.evaluation_env)
+  | Definition of Driver.evaluation_env
+  | Exception of exn
+
+
 let handle_message msg env =
-  let result, new_env = Eval_links.evaluate msg env in
-  match result with
-  | Some exp -> (("   " ^ (Value.string_of_value exp)), new_env)
-  | None -> ("   Valid Definition", new_env)
+  let out : eval = 
+    try 
+      match Eval_links.evaluate msg env with 
+      | (Some v, envs) -> Expression (v, envs)
+      | (None, envs) -> Definition envs
+    with
+    | ex -> Exception ex in
+  match out with 
+  | Expression ex -> 
+    let result, new_env = ex in
+    (("   " ^ (Value.string_of_value result)), new_env)
+  | Definition def -> ("   Valid Definition", def)
+  | Exception e -> (("   Exception: " ^ Printexc.to_string e), env)
         
 
 let rec handle_connection ic oc env () =

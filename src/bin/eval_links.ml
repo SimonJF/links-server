@@ -10,7 +10,7 @@ let parse str =
 (* Takes a REPL string and produces a pair of perhaps a Links value (in the case of an expression)
  * and updated environments. *)
 (* Mostly lifted from bin/repl.ml *)
-let evaluate str envs =
+let evaluate str envs : (Value.t option * Driver.evaluation_env) =
 
   (* Evaluates a parse result, returning a Links value if
    * an expression, and updated environments. *)
