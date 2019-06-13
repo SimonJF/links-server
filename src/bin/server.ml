@@ -4,7 +4,7 @@ open Links_core
 
 
 let listen_address = Unix.inet_addr_loopback
-let port = 9000
+let port = 9001
 let backlog = 10
 let init = Eval_links.init ()
 
@@ -13,7 +13,27 @@ type eval =
   | Expression of (Value.t * Driver.evaluation_env)
   | Definition of Driver.evaluation_env
   | Exception of exn
+  
 
+let jsonify out =
+  match out with
+  | Expression ex ->
+    let result, _ = ex in
+    let response = `Assoc [ ("response", `String "expression");
+             ("content", `String (Value.string_of_value result)); ] in
+    print_string (Yojson.to_string response); flush stdout; Yojson.to_string response
+  | Definition _ -> 
+    let response = `Assoc [ ("response", `String "definition"); ] in
+    Yojson.to_string response
+  | Exception e -> 
+    let response = `Assoc [ ("response", `String "exception");
+             ("content", `String (Errors.format_exception e)); ] in
+    Yojson.to_string response
+             
+     
+let json_to_string json = 
+  let open Yojson.Basic.Util in
+  Yojson.Basic.from_string json |> member "input" |> to_string
 
 let handle_message msg env =
   let out : eval = 
@@ -25,10 +45,11 @@ let handle_message msg env =
     | ex -> Exception ex in
   match out with 
   | Expression ex -> 
-    let result, new_env = ex in
-    (("   " ^ (Value.string_of_value result)), new_env)
-  | Definition def -> ("   Valid Definition", def)
-  | Exception e -> (("   Exception: " ^ Printexc.to_string e), env)
+    let _, new_env = ex in
+    ((jsonify out), new_env)
+  | Definition def -> ((jsonify out), def)
+  | Exception e -> ((jsonify out), env)
+  
         
 
 let rec handle_connection ic oc env () =
@@ -38,10 +59,11 @@ let rec handle_connection ic oc env () =
   read >>=
   (fun msg ->
       match msg with
-      | Some msg ->
+      | Some json ->
+		  Logs_lwt.info (fun m -> m "Received: %s" json) >>= fun _ ->
+	      let msg = json_to_string json in
           let reply, new_env = handle_message msg env in
-          write reply >>=
-          handle_connection ic oc new_env
+          write reply >>= handle_connection ic oc new_env
       | None -> Logs_lwt.info (fun m -> m "Connection closed") >>= return)
 
 let accept_connection conn =
