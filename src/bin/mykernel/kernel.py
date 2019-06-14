@@ -52,7 +52,7 @@ class LinksKernel(MetaKernel):
         self._init_socket()
 
         if not silent:
-            json_code = json.dumps({"input": code})
+            json_code = json.dumps({"input": code}) + "\n"
             print("json query: " + json_code)
 
         try:
