@@ -4,7 +4,7 @@ open Links_core
 
 
 let listen_address = Unix.inet_addr_loopback
-let port = 9001
+let port = 9000
 let backlog = 10
 let init = Eval_links.init ()
 
@@ -21,7 +21,7 @@ let jsonify out =
     let result, _ = ex in
     let response = `Assoc [ ("response", `String "expression");
              ("content", `String (Value.string_of_value result)); ] in
-    print_string (Yojson.to_string response); flush stdout; Yojson.to_string response
+    Yojson.to_string response
   | Definition _ ->
     let response = `Assoc [ ("response", `String "definition"); ] in
     Yojson.to_string response
@@ -58,10 +58,8 @@ let rec handle_connection ic oc env () =
 
   read >>=
   (fun msg ->
-      Printf.printf "received a message\n%!";
       match msg with
       | Some json ->
-        Printf.printf "received %s\n%!" json;
         let msg = json_to_string json in
           let reply, new_env = handle_message msg env in
           write reply >>= handle_connection ic oc new_env
@@ -79,6 +77,7 @@ let create_socket () =
     let sock = socket PF_INET SOCK_STREAM 0 in
     bind sock @@ ADDR_INET(listen_address, port) >>= fun _ ->
     listen sock backlog;
+    Logs.info (fun m -> m "Listening");
     return sock
 
 let create_server sock =

@@ -1,11 +1,9 @@
 
 """
-Example kernel for execution of Links code for a Jupyter Notebook
+Kernel for execution of Links code for a Jupyter Notebook
 """
 
 from metakernel import MetaKernel
-import re
-import sys
 import socket
 import json
 
@@ -14,16 +12,7 @@ from IPython.display import Image
 
 
 HOST = "127.0.0.1"
-PORT = 9001
-
-def parse_json(json):
-    json_str = json.loads(json)
-
-    if json_str["response"] == "definition":
-            pass
-    else:
-            # Exception || Expression
-            print(json_str["content"])
+PORT = 9000
 
 
 class LinksKernel(MetaKernel):
@@ -31,6 +20,10 @@ class LinksKernel(MetaKernel):
     implementation = "Links Kernel"
     implementation_version = "1.0"
     language = "Links"
+    language_info = {
+        'name': 'links_kernel',
+        'file_extension': '.links'
+    }
 
     banner = "Links Kernel for code interaction!"
 
@@ -42,29 +35,30 @@ class LinksKernel(MetaKernel):
             except:
                 raise RuntimeError("Unable to connect")
 
+    def parse_json(self, inp):
+        
+        json_str = json.loads(inp)
+        
+        # Either an Exception or an Expression
+        if not json_str["response"] == "definition":
+            print(json_str["content"])
+
 
     def do_execute_direct(self, code, silent=False):
-        """
-        :param code:(str) to be executed
-        :param silent:(bool) Should output be displayed
-        :return: None
-        """
+        
         self._init_socket()
-
-        if not silent:
-            json_code = json.dumps({"input": code}) + "\n"
-            print("json query: " + json_code)
+        
+        json_code = json.dumps({"input": code}) + "\n"
 
         try:
             self.sock.send(json_code.encode('utf-8'))
-            print("after send")
+            
             recv = self.sock.recv(1024)
-            print("json response: " + recv)
-            parse_json(recv)
+            self.parse_json(recv) 
         except:
-            print("\nTransmission failed\n")
+            raise RuntimeError("Transmission failed")
+        
+           
 
 if __name__ == '__main__':
     LinksKernel.run_as_main()
-    #from ipykernel.kernelapp import IPKernelApp
-    #IPKernelApp.launch_instance(kernel_class=LinksKernel)
