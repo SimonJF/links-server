@@ -13,7 +13,7 @@ type eval =
   | Expression of (Value.t * Driver.evaluation_env)
   | Definition of Driver.evaluation_env
   | Exception of exn
-  
+
 
 let jsonify out =
   match out with
@@ -22,35 +22,35 @@ let jsonify out =
     let response = `Assoc [ ("response", `String "expression");
              ("content", `String (Value.string_of_value result)); ] in
     print_string (Yojson.to_string response); flush stdout; Yojson.to_string response
-  | Definition _ -> 
+  | Definition _ ->
     let response = `Assoc [ ("response", `String "definition"); ] in
     Yojson.to_string response
-  | Exception e -> 
+  | Exception e ->
     let response = `Assoc [ ("response", `String "exception");
              ("content", `String (Errors.format_exception e)); ] in
     Yojson.to_string response
-             
-     
-let json_to_string json = 
+
+
+let json_to_string json =
   let open Yojson.Basic.Util in
   Yojson.Basic.from_string json |> member "input" |> to_string
 
 let handle_message msg env =
-  let out : eval = 
-    try 
-      match Eval_links.evaluate msg env with 
+  let out : eval =
+    try
+      match Eval_links.evaluate msg env with
       | (Some v, envs) -> Expression (v, envs)
       | (None, envs) -> Definition envs
     with
     | ex -> Exception ex in
-  match out with 
-  | Expression ex -> 
+  match out with
+  | Expression ex ->
     let _, new_env = ex in
     ((jsonify out), new_env)
   | Definition def -> ((jsonify out), def)
   | Exception e -> ((jsonify out), env)
-  
-        
+
+
 
 let rec handle_connection ic oc env () =
   let read = Lwt_io.read_line_opt ic in (* Type: Lwt.t (string option)  *)
@@ -58,10 +58,11 @@ let rec handle_connection ic oc env () =
 
   read >>=
   (fun msg ->
+      Printf.printf "received a message\n%!";
       match msg with
       | Some json ->
-		  Logs_lwt.info (fun m -> m "Received: %s" json) >>= fun _ ->
-	      let msg = json_to_string json in
+        Printf.printf "received %s\n%!" json;
+        let msg = json_to_string json in
           let reply, new_env = handle_message msg env in
           write reply >>= handle_connection ic oc new_env
       | None -> Logs_lwt.info (fun m -> m "Connection closed") >>= return)
