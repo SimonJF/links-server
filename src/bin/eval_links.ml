@@ -5,7 +5,7 @@ open Links_core.Sugartypes
 (* Parses a string and returns a Links expression *)
 (* TODO: Exception handling *)
 let parse str =
-  Parse.parse_file Parse.program str
+  Parse.parse_string Parse.program str
 
 (* Takes a REPL string and produces a pair of perhaps a Links value (in the case of an expression)
  * and updated environments. *)
@@ -22,13 +22,14 @@ let evaluate str envs : Driver.evaluation_result =
   (* Do... some magic? *)
   let tenv = Var.varify_env (nenv, tyenv.Types.var_env) in
   (* Desugar the program into an IR program*)
-  let globals, (locals, main), _nenv =
+  let globals, (locals, main), nenv' =
     Sugartoir.desugar_program (nenv, tenv, tyenv.Types.effect_row) program in
 
   let program = (globals @ locals, main) in
   let valenv, v = Driver.process_program true envs program [] in
   {
-    result_env = (valenv, nenv,
+    result_env = (valenv,
+      Env.String.extend nenv nenv',
       Types.extend_typing_environment tyenv tyenv');
     result_value = v;
     result_type = program_ty
