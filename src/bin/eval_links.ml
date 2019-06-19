@@ -10,48 +10,41 @@ let parse str =
 (* Takes a REPL string and produces a pair of perhaps a Links value (in the case of an expression)
  * and updated environments. *)
 (* Mostly lifted from bin/repl.ml *)
-let evaluate str envs : (Value.t option * Driver.evaluation_env) =
-
-  (* Evaluates a parse result, returning a Links value if
-   * an expression, and updated environments. *)
-  let evaluate_parse_result envs parse_result =
-    let _, nenv, tyenv = envs in
-    let (defs, e, nenv'), tyenv' = parse_result in
-    let valenv, v = Driver.process_program true envs e [] in
-    let updated_envs =
-      (valenv,
-       Env.String.extend nenv nenv',
-       Types.extend_typing_environment tyenv tyenv') in
-    (v, updated_envs) in
-
-    (*
-    match parse_result with
-      | `Definitions (defs, nenv'), tyenv' ->
-          (* Process each definition in turn. *)
-          let valenv, _ =
-            Driver.process_program true envs
-              (defs, Ir.Return (Ir.Extend (StringMap.empty, None)))
-              [] in
-          let updated_envs =
-            (valenv,
-             Env.String.extend nenv nenv',
-             Types.extend_typing_environment tyenv tyenv') in
-          (None, updated_envs)
-      | `Expression (e, _t), _ ->
-          let valenv, v = Driver.process_program true envs e [] in
-          let (_, nenv, tenv) = envs in
-          let updated_envs = (valenv, nenv, tenv) in
-          (Some v, updated_envs) in
-          *)
-
+let evaluate str envs : Driver.evaluation_result =
+  let open Driver in
+  (* Begin by parsing the string *)
   let expr, pos_context = parse str in
+  (* Split initial environments *)
   let (_, nenv, tyenv) = envs in
-  (* Begin by parsing the input string. *)
+  (* Put the program through the frontend *)
   let (program, program_ty, tyenv'), _ =
     Frontend.Pipeline.program tyenv pos_context expr in
-  let program =
-    let tenv = Var.varify_env (nenv, tyenv.Types.var_env) in
+  (* Do... some magic? *)
+  let tenv = Var.varify_env (nenv, tyenv.Types.var_env) in
+  (* Desugar the program into an IR program*)
+  let globals, (locals, main), _nenv =
     Sugartoir.desugar_program (nenv, tenv, tyenv.Types.effect_row) program in
+
+  let program = (globals @ locals, main) in
+  let valenv, v = Driver.process_program true envs program [] in
+  {
+    result_env = (valenv, nenv,
+      Types.extend_typing_environment tyenv tyenv');
+    result_value = v;
+    result_type = program_ty
+  }
+
+  (*
+      Error: This expression has type
+         ((Ir.binding list * Ir.tail_computation) * Types.typ) *
+         (int Env.String.t * Types.typ Env.Int.t) * 'a list
+       but an expression was expected of type
+         Driver.evaluation_env =
+           Value.env * int Env.String.t * Types.typing_environment
+       Type (Ir.binding list * Ir.tail_computation) * Types.typ
+       is not compatible with type Value.env = Value.t Value.Env.t
+   *
+   *)
     (*
     | Definitions defs ->
         let tenv = Var.varify_env (nenv, tyenv.Types.var_env) in
@@ -66,7 +59,7 @@ let evaluate str envs : (Value.t option * Driver.evaluation_env) =
      * but it might make sense to whitelist some useful-yet-safe ones later. *)
     | Directive _      -> raise (Failure ("Directives not allowed.")) in
     *)
-  evaluate_parse_result envs (program, tyenv')
+  (* evaluate_parse_result envs (program, tyenv') *)
 
 let init () =
   let (_prelude, envs) = Driver.NonInteractive.load_prelude () in

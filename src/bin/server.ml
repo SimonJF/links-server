@@ -10,21 +10,20 @@ let init = Eval_links.init ()
 
 (* eval created from result of Eval_links.evaluate *)
 type eval =
-  | Expression of (Value.t * Driver.evaluation_env)
-  | Definition of Driver.evaluation_env
+  | Expression of Driver.evaluation_result
   | Exception of exn
-
 
 let jsonify out =
   match out with
   | Expression ex ->
-    let result, _ = ex in
     let response = `Assoc [ ("response", `String "expression");
-             ("content", `String (Value.string_of_value result)); ] in
+             ("content", `String (Value.string_of_value ex.result_value)); ] in
     Yojson.to_string response
+    (*
   | Definition _ ->
     let response = `Assoc [ ("response", `String "definition"); ] in
     Yojson.to_string response
+    *)
   | Exception e ->
     let response = `Assoc [ ("response", `String "exception");
              ("content", `String (Errors.format_exception e)); ] in
@@ -38,18 +37,13 @@ let json_to_string json =
 let handle_message msg env =
   let out : eval =
     try
-      match Eval_links.evaluate msg env with
-      | (Some v, envs) -> Expression (v, envs)
-      | (None, envs) -> Definition envs
+      Expression (Eval_links.evaluate msg env)
     with
-    | ex -> Exception ex in
+      | ex -> Exception ex in
   match out with
-  | Expression ex ->
-    let _, new_env = ex in
-    ((jsonify out), new_env)
-  | Definition def -> ((jsonify out), def)
-  | Exception e -> ((jsonify out), env)
-
+    | Expression ex ->
+      ((jsonify out), ex.result_env)
+    | Exception e -> ((jsonify out), env)
 
 
 let rec handle_connection ic oc env () =
