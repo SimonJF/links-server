@@ -57,14 +57,4 @@ let evaluate str envs : (Value.t option * Driver.evaluation_env) =
 let init () =
   let (_prelude, envs) = Driver.NonInteractive.load_prelude () in
   envs
-
-(* Main entry point *)
-let () =
-  let links_string_1 = "var z = \"Hello!\";" in
-  let links_string_2 = "z;" in
-  let envs = init () in
-  let (_, envs) = evaluate links_string_1 envs in
-  let (res_opt, _) = evaluate links_string_2 envs in
-  match res_opt with
-    | Some v -> print_endline ("Some " ^ (Value.string_of_value v))
-    | None -> print_endline "None"
+  
