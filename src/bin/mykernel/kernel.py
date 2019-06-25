@@ -6,10 +6,6 @@ Kernel for execution of Links code for a Jupyter Notebook
 from metakernel import MetaKernel
 import socket
 import json
-import re
-
-# Can use this to display images within notebook
-from IPython.display import Image
 
 
 HOST = "127.0.0.1"
@@ -28,6 +24,7 @@ class LinksKernel(MetaKernel):
 
     banner = "Links Kernel for code interaction!"
 
+
     def _init_socket(self):
         if self.sock == None:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -36,43 +33,13 @@ class LinksKernel(MetaKernel):
             except:
                 raise RuntimeError("Unable to connect")
 
-    def print_json(self, inp):
 
-        # Either an Exception or an Expression
-        if not inp["response"] == "definition":
-            print(inp["content"])
 
-    """ # Shouldn't be necessary
-    def find_delims(self, code, index):
-
-        delims = []
-
-        if ';' in code:
-            if '{' in code:
-                (before,_, after) = code.partition('{')
-                if ';' in before:
-                    delims = [x.start() + index + 1 for x in re.finditer(';', before)]
-
-                (_,_,rest) = after.partition('}')
-                return delims + self.find_delims(rest, index + code.find(rest))
-
-            else:
-                return [x.start() + index + 1 for x in re.finditer(';', code)]
-        else:
-            return []
-
-    """
     def do_execute_direct(self, code, silent=False):
 
         self._init_socket()
         code = code.rstrip()
 
-        #delims = self.find_delims(code, 0)
-        #delims.insert(0,0)
-
-        #lines = [code[i:j] for (i, j) in zip(delims, delims[1:])]
-
-        #for l in lines:
         json_code = json.dumps({"input": code}) + "\n"
 
         try:
@@ -80,14 +47,23 @@ class LinksKernel(MetaKernel):
             recv = self.sock.recv(1024)
             json_str = json.loads(recv)
 
-            #if json_str["response"] == "exception":
-                #break
-
         except:
             raise RuntimeError("Transmission failed")
-            # restart kernel maybe
 
-        self.print_json(json_str)
+        # Return using the following form replacing wikipedia with relevant URL:
+        # miframe = "<iframe src=\"https://en.wikipedia.org/wiki/Main_Page\" allowfullscreen=\"\" width=\"900\" height=\"600\" frameborder=\"0\"></iframe>"
+
+        to_return = json_str["content"]
+
+        display_content = {
+          'source': 'kernel',
+          'data': {
+            'text/plain': to_return,
+            'text/html': to_return
+          }, 'metadata': {}
+        }
+
+        self.send_response(self.iopub_socket, 'display_data', display_content)
 
 
 if __name__ == '__main__':
