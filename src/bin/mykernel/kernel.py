@@ -40,6 +40,7 @@ class LinksKernel(MetaKernel):
         self._init_socket()
         code = code.rstrip()
 
+
         json_code = json.dumps({"input": code}) + "\n"
 
         try:
@@ -47,23 +48,32 @@ class LinksKernel(MetaKernel):
             recv = self.sock.recv(1024)
             json_str = json.loads(recv)
 
-        except:
-            raise RuntimeError("Transmission failed")
+            to_return = json_str["content"]
+
+            if json_str["response"] == "exception":
+                self.Error(to_return)
+            elif code[-1] == ';':
+                # Semi-colon indicates no output
+                pass
+            else:
+                display_content = {
+                    'source': 'kernel',
+                    'data': {
+                        'text/plain': to_return,
+                        'text/html': to_return
+                    }, 'metadata': {}
+                }
+
+                self.send_response(self.iopub_socket, 'display_data', display_content)
+
+        except KeyboardInterrupt as e:
+            self.Error("***: KeyboardInterrupt")
+            self.do_shutdown(True)
+            self.sock.close()
+            self.sock = None
 
         # Return using the following form replacing wikipedia with relevant URL:
         # miframe = "<iframe src=\"https://en.wikipedia.org/wiki/Main_Page\" allowfullscreen=\"\" width=\"900\" height=\"600\" frameborder=\"0\"></iframe>"
-
-        to_return = json_str["content"]
-
-        display_content = {
-          'source': 'kernel',
-          'data': {
-            'text/plain': to_return,
-            'text/html': to_return
-          }, 'metadata': {}
-        }
-
-        self.send_response(self.iopub_socket, 'display_data', display_content)
 
 
 if __name__ == '__main__':
