@@ -35,33 +35,6 @@ let evaluate str envs : Driver.evaluation_result =
     result_type = program_ty
   }
 
-  (*
-      Error: This expression has type
-         ((Ir.binding list * Ir.tail_computation) * Types.typ) *
-         (int Env.String.t * Types.typ Env.Int.t) * 'a list
-       but an expression was expected of type
-         Driver.evaluation_env =
-           Value.env * int Env.String.t * Types.typing_environment
-       Type (Ir.binding list * Ir.tail_computation) * Types.typ
-       is not compatible with type Value.env = Value.t Value.Env.t
-   *
-   *)
-    (*
-    | Definitions defs ->
-        let tenv = Var.varify_env (nenv, tyenv.Types.var_env) in
-        let defs, nenv' = Sugartoir.desugar_definitions (nenv, tenv, tyenv.Types.effect_row) defs in
-        `Definitions (defs, nenv')
-    | Expression e     ->
-        let tenv = Var.varify_env (nenv, tyenv.Types.var_env) in
-        let e = Sugartoir.desugar_expression (nenv, tenv, tyenv.Types.effect_row) e in
-        `Expression (e, program_ty)
-    (* SJF: The Links REPL allows "directives" which do things like loading files and such.
-     * A lot of these could be used to do insecure things. I'm disabling them all for now,
-     * but it might make sense to whitelist some useful-yet-safe ones later. *)
-    | Directive _      -> raise (Failure ("Directives not allowed.")) in
-    *)
-  (* evaluate_parse_result envs (program, tyenv') *)
-
 let init () =
-  let (_prelude, envs) = Driver.NonInteractive.load_prelude () in
-  envs
+  let (globals, envs) = Driver.NonInteractive.load_prelude () in
+  (globals, envs)

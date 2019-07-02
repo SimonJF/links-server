@@ -1,12 +1,12 @@
 open Lwt
-open Eval_links
 open Links_core
+open Webserver
 
 
 let listen_address = Unix.inet_addr_loopback
 let port = 9000
 let backlog = 10
-let init = Eval_links.init ()
+let (globals, init_envs) = Eval_links.init ()
 
 (* eval created from result of Eval_links.evaluate *)
 type eval =
@@ -43,7 +43,7 @@ let handle_message msg env =
   match out with
     | Expression ex ->
       ((jsonify out), ex.result_env)
-    | Exception e -> ((jsonify out), env)
+    | Exception _ -> ((jsonify out), env)
 
 
 let rec handle_connection ic oc env () =
@@ -63,7 +63,7 @@ let accept_connection conn =
     let fd, _ = conn in
     let ic = Lwt_io.of_fd ~mode:Lwt_io.Input fd in
     let oc = Lwt_io.of_fd ~mode:Lwt_io.Output fd in
-    Lwt.on_failure (handle_connection ic oc init ()) (fun e -> Logs.err (fun m -> m "%s"  (Printexc.to_string e) ));
+    Lwt.on_failure (handle_connection ic oc init_envs ()) (fun e -> Logs.err (fun m -> m "%s"  (Printexc.to_string e) ));
     Logs_lwt.info (fun m -> m "New connection") >>= return
 
 let create_socket () =
@@ -82,6 +82,9 @@ let create_server sock =
 let () =
     let () = Logs.set_reporter (Logs.format_reporter ()) in
     let () = Logs.set_level (Some Logs.Info) in
+    let (venv, _, _) = init_envs in
+    Webserver.init init_envs globals [];
+    async (fun () -> Webserver.start venv);
     Lwt_main.run
       (create_socket () >>= fun sock ->
        let serve = create_server sock in
