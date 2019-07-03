@@ -19,11 +19,6 @@ let jsonify out =
     let response = `Assoc [ ("response", `String "expression");
              ("content", `String (Value.string_of_value ex.result_value)); ] in
     Yojson.to_string response
-    (*
-  | Definition _ ->
-    let response = `Assoc [ ("response", `String "definition"); ] in
-    Yojson.to_string response
-    *)
   | Exception e ->
     let response = `Assoc [ ("response", `String "exception");
              ("content", `String (Errors.format_exception e)); ] in
@@ -37,7 +32,10 @@ let json_to_string json =
 let handle_message msg env =
   let out : eval =
     try
-      Expression (Eval_links.evaluate msg env)
+      let res = Eval_links.evaluate msg env in
+      match res.result_type with
+        | `Alias (("Page", _), _) -> failwith "This was a page, what were you thinking?"
+        | _ -> Expression res
     with
       | ex -> Exception ex in
   match out with
