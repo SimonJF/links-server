@@ -18,7 +18,7 @@ class LinksKernel(MetaKernel):
     implementation_version = "1.0"
     language = "Links"
     language_info = {
-        'name': 'links_kernel',
+        'name': 'links',
         'file_extension': '.links'
     }
 
@@ -52,10 +52,15 @@ class LinksKernel(MetaKernel):
 
             if json_str["response"] == "exception":
                 self.Error(to_return)
-            elif code[-1] == ';':
+
+            elif json_str["response"] == "page":
+                path = json_str["path"]
+                to_return = "<iframe src=\"http://localhost:8080{}\" allowfullscreen=\"\" width=\"900\" height=\"600\" frameborder=\"0\"></iframe>".format(path)
+            #elif code[-1] == ';':
                 # Semi-colon indicates no output
-                pass
-            else:
+                #pass
+
+            if not json_str["response"] == "exception" and not code[-1] == ';':
                 display_content = {
                     'source': 'kernel',
                     'data': {

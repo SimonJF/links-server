@@ -1,4 +1,6 @@
 open Lwt
+open Lwt_timeout
+open Eval_links
 open Links_core
 open Webserver
 
@@ -9,12 +11,23 @@ let backlog = 10
 let (globals, init_envs) = Eval_links.init ()
 
 (* eval created from result of Eval_links.evaluate *)
+type page = {
+  page_result : Driver.evaluation_result;
+  page_path : string
+}
+
 type eval =
   | Expression of Driver.evaluation_result
   | Exception of exn
+  | Page of page
 
 let jsonify out =
   match out with
+  | Page p ->
+    let response = `Assoc [ ("response", `String "page");
+           ("path", `String p.page_path);
+           ("content", `String (Value.string_of_value p.page_result.result_value)); ] in
+  Yojson.to_string response
   | Expression ex ->
     let response = `Assoc [ ("response", `String "expression");
              ("content", `String (Value.string_of_value ex.result_value)); ] in
@@ -24,24 +37,25 @@ let jsonify out =
              ("content", `String (Errors.format_exception e)); ] in
     Yojson.to_string response
 
-
 let json_to_string json =
   let open Yojson.Basic.Util in
   Yojson.Basic.from_string json |> member "input" |> to_string
 
 let handle_message msg env =
-  let out : eval =
+  let out =
     try
       let res = Eval_links.evaluate msg env in
       match res.result_type with
-        | `Alias (("Page", _), _) -> failwith "This was a page, what were you thinking?"
+        | `Alias (("Page", _), _) -> let (path, envs) =
+          Webserver.add_dynamic_route res.result_env res.result_value in
+          Page { page_result = res; page_path = path }
         | _ -> Expression res
     with
       | ex -> Exception ex in
   match out with
     | Expression ex ->
       ((jsonify out), ex.result_env)
-    | Exception _ -> ((jsonify out), env)
+    | _ -> ((jsonify out), env)
 
 
 (* Used for testing *)
