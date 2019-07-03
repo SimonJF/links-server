@@ -46,6 +46,11 @@ let handle_message msg env =
     | Exception _ -> ((jsonify out), env)
 
 
+(* Used for testing *)
+let basic_page =
+  let pg = Eval_links.evaluate "page <html><h1>Yup</h1></html>" init_envs in
+  pg.result_value
+
 let rec handle_connection ic oc env () =
   let read = Lwt_io.read_line_opt ic in (* Type: Lwt.t (string option)  *)
   let write data = Lwt_io.write_line oc data in
@@ -59,11 +64,17 @@ let rec handle_connection ic oc env () =
           write reply >>= handle_connection ic oc new_env
       | None -> Logs_lwt.info (fun m -> m "Connection closed") >>= return)
 
+
+let add_and_handle ic oc envs =
+  let (path, envs) = Webserver.add_dynamic_route envs basic_page in
+  Logs_lwt.info (fun m -> m "Path: %s" path) >>= fun _ ->
+  handle_connection ic oc envs ()
+
 let accept_connection conn =
     let fd, _ = conn in
     let ic = Lwt_io.of_fd ~mode:Lwt_io.Input fd in
     let oc = Lwt_io.of_fd ~mode:Lwt_io.Output fd in
-    Lwt.on_failure (handle_connection ic oc init_envs ()) (fun e -> Logs.err (fun m -> m "%s"  (Printexc.to_string e) ));
+    Lwt.on_failure (add_and_handle ic oc init_envs) (fun e -> Logs.err (fun m -> m "%s"  (Printexc.to_string e) ));
     Logs_lwt.info (fun m -> m "New connection") >>= return
 
 let create_socket () =
@@ -84,8 +95,9 @@ let () =
     let () = Logs.set_level (Some Logs.Info) in
     let (venv, _, _) = init_envs in
     Webserver.init init_envs globals [];
-    async (fun () -> Webserver.start venv);
-    Lwt_main.run
-      (create_socket () >>= fun sock ->
+    Proc.Proc.run
+      (fun () ->
+       let () = async (fun () -> Webserver.start venv) in
+       create_socket () >>= fun sock ->
        let serve = create_server sock in
        serve ())

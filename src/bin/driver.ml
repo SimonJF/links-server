@@ -36,7 +36,7 @@ let process_program
 
   (if Settings.get_value BS.typecheck_only then exit 0);
 
-  Webserver.init (valenv, nenv, tyenv) globals external_files;
+ (*  Webserver.init (valenv, nenv, tyenv) globals external_files; *)
 
   lazy (Eval.run_program valenv post_backend_pipeline_program) |>measure_as<| "run_program"
 
