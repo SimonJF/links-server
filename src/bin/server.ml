@@ -1,6 +1,4 @@
 open Lwt
-open Lwt_timeout
-open Eval_links
 open Links_core
 open Webserver
 
@@ -10,12 +8,14 @@ let port = 9000
 let backlog = 10
 let (globals, init_envs) = Eval_links.init ()
 
-(* eval created from result of Eval_links.evaluate *)
+exception Timeout of string
+
 type page = {
   page_result : Driver.evaluation_result;
   page_path : string
 }
 
+(* eval created from result of Eval_links.evaluate *)
 type eval =
   | Expression of Driver.evaluation_result
   | Exception of exn
@@ -25,8 +25,7 @@ let jsonify out =
   match out with
   | Page p ->
     let response = `Assoc [ ("response", `String "page");
-           ("path", `String p.page_path);
-           ("content", `String (Value.string_of_value p.page_result.result_value)); ] in
+           ("content", `String p.page_path); ] in
   Yojson.to_string response
   | Expression ex ->
     let response = `Assoc [ ("response", `String "expression");
@@ -44,24 +43,21 @@ let json_to_string json =
 let handle_message msg env =
   let out =
     try
-      let res = Eval_links.evaluate msg env in
-      match res.result_type with
-        | `Alias (("Page", _), _) -> let (path, envs) =
-          Webserver.add_dynamic_route res.result_env res.result_value in
-          Page { page_result = res; page_path = path }
-        | _ -> Expression res
+      let timeout = Lwt_unix.sleep 4. in
+      Lwt_main.run (Lwt.pick [
+        (Lwt.return (Eval_links.evaluate msg env) >|= fun x ->
+        match x.result_type with
+        | `Alias (("Page", _), _) -> let (path, _) =
+          Webserver.add_dynamic_route x.result_env x.result_value in
+          Page { page_result = x; page_path = path }
+        | _ -> Expression x);
+        (timeout >|= fun () -> Exception (Timeout "Timeout Exception"));])
     with
       | ex -> Exception ex in
   match out with
     | Expression ex ->
       ((jsonify out), ex.result_env)
     | _ -> ((jsonify out), env)
-
-
-(* Used for testing *)
-let basic_page =
-  let pg = Eval_links.evaluate "page <html><h1>Yup</h1></html>" init_envs in
-  pg.result_value
 
 let rec handle_connection ic oc env () =
   let read = Lwt_io.read_line_opt ic in (* Type: Lwt.t (string option)  *)
@@ -76,17 +72,11 @@ let rec handle_connection ic oc env () =
           write reply >>= handle_connection ic oc new_env
       | None -> Logs_lwt.info (fun m -> m "Connection closed") >>= return)
 
-
-let add_and_handle ic oc envs =
-  let (path, envs) = Webserver.add_dynamic_route envs basic_page in
-  Logs_lwt.info (fun m -> m "Path: %s" path) >>= fun _ ->
-  handle_connection ic oc envs ()
-
 let accept_connection conn =
     let fd, _ = conn in
     let ic = Lwt_io.of_fd ~mode:Lwt_io.Input fd in
     let oc = Lwt_io.of_fd ~mode:Lwt_io.Output fd in
-    Lwt.on_failure (add_and_handle ic oc init_envs) (fun e -> Logs.err (fun m -> m "%s"  (Printexc.to_string e) ));
+    Lwt.on_failure (handle_connection ic oc init_envs ()) (fun e -> Logs.err (fun m -> m "%s"  (Printexc.to_string e) ));
     Logs_lwt.info (fun m -> m "New connection") >>= return
 
 let create_socket () =

@@ -24,7 +24,7 @@ class LinksKernel(MetaKernel):
 
     banner = "Links Kernel for code interaction!"
 
-
+    # Connect to server where Links code is sent to be executed
     def _init_socket(self):
         if self.sock == None:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -33,39 +33,34 @@ class LinksKernel(MetaKernel):
             except:
                 raise RuntimeError("Unable to connect")
 
-
-
+    # Called when a cell is run in the notebook
     def do_execute_direct(self, code, silent=False):
 
         self._init_socket()
         code = code.rstrip()
-
 
         json_code = json.dumps({"input": code}) + "\n"
 
         try:
             self.sock.send(json_code.encode('utf-8'))
             recv = self.sock.recv(1024)
+            # Response is a json
             json_str = json.loads(recv)
 
-            to_return = json_str["content"]
+            response = json_str["content"]
 
             if json_str["response"] == "exception":
-                self.Error(to_return)
+                self.Error(response)
 
             elif json_str["response"] == "page":
-                path = json_str["path"]
-                to_return = "<iframe src=\"http://localhost:8080{}\" allowfullscreen=\"\" width=\"900\" height=\"600\" frameborder=\"0\"></iframe>".format(path)
-            #elif code[-1] == ';':
-                # Semi-colon indicates no output
-                #pass
+                response = "<iframe src=\"http://localhost:8080{}\" width=\"900\" height=\"400\"></iframe>".format(response)
 
             if not json_str["response"] == "exception" and not code[-1] == ';':
                 display_content = {
                     'source': 'kernel',
                     'data': {
-                        'text/plain': to_return,
-                        'text/html': to_return
+                        'text/plain': response,
+                        'text/html': response
                     }, 'metadata': {}
                 }
 
@@ -76,9 +71,6 @@ class LinksKernel(MetaKernel):
             self.do_shutdown(True)
             self.sock.close()
             self.sock = None
-
-        # Return using the following form replacing wikipedia with relevant URL:
-        # miframe = "<iframe src=\"https://en.wikipedia.org/wiki/Main_Page\" allowfullscreen=\"\" width=\"900\" height=\"600\" frameborder=\"0\"></iframe>"
 
 
 if __name__ == '__main__':
