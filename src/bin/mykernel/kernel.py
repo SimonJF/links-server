@@ -42,9 +42,9 @@ class LinksKernel(MetaKernel):
         json_code = json.dumps({"input": code}) + "\n"
 
         try:
+            # Send and receive code as a json
             self.sock.send(json_code.encode('utf-8'))
             recv = self.sock.recv(1024)
-            # Response is a json
             json_str = json.loads(recv)
 
             response = json_str["content"]

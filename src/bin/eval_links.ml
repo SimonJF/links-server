@@ -1,6 +1,4 @@
 open Links_core
-open Links_core.Utility
-open Links_core.Sugartypes
 open Lwt
 
 (* Parses a string and returns a Links expression *)
