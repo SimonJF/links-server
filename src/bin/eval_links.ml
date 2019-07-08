@@ -1,6 +1,7 @@
 open Links_core
 open Links_core.Utility
 open Links_core.Sugartypes
+open Lwt
 
 (* Parses a string and returns a Links expression *)
 (* TODO: Exception handling *)
@@ -10,7 +11,7 @@ let parse str =
 (* Takes a REPL string and produces a pair of perhaps a Links value (in the case of an expression)
  * and updated environments. *)
 (* Mostly lifted from bin/repl.ml *)
-let evaluate str envs : Driver.evaluation_result =
+let evaluate str envs : Driver.evaluation_result Lwt.t =
   let open Driver in
   (* Begin by parsing the string *)
   let expr, pos_context = parse str in
@@ -26,7 +27,8 @@ let evaluate str envs : Driver.evaluation_result =
     Sugartoir.desugar_program (nenv, tenv, tyenv.Types.effect_row) program in
 
   let program = (globals @ locals, main) in
-  let valenv, v = Driver.process_program true envs program [] in
+  Driver.process_program true envs program [] >>= fun (valenv, v) ->
+  Lwt.return
   {
     result_env = (valenv,
       Env.String.extend nenv nenv',

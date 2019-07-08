@@ -2,6 +2,7 @@ open Links_core
 open Webserver
 open Performance
 open Utility
+open Lwt
 
 module BS = Basicsettings
 module Eval = Evalir.Eval(Webserver)
@@ -24,7 +25,7 @@ let process_program
       (envs : evaluation_env)
       (program : Ir.program)
       external_files
-          : (Value.env * Value.t) =
+          : (Value.env * Value.t) Lwt.t =
   let (valenv, nenv, tyenv) = envs in
   let tenv = (Var.varify_env (nenv, tyenv.Types.var_env)) in
 
@@ -33,16 +34,10 @@ let process_program
   let (globals, _main) as post_backend_pipeline_program =
     Backend.transform_program perform_optimisations tenv program in
 
-
   (if Settings.get_value BS.typecheck_only then exit 0);
 
  (*  Webserver.init (valenv, nenv, tyenv) globals external_files; *)
-
-  lazy (Eval.run_program valenv post_backend_pipeline_program) |>measure_as<| "run_program"
-
-
-let process_program  interacting envs program external_files =
-  lazy (process_program  interacting envs program external_files) |>measure_as<| "process_program"
+  Eval.run_program_as_thread valenv post_backend_pipeline_program
 
 let die_on_exception f x =
   Errors.display ~default:(fun _ -> exit 1) (lazy (f x))
@@ -63,19 +58,19 @@ let evaluate
       parse_fun
       (envs : evaluation_env)
       filename
-          : evaluation_result =
+          : evaluation_result Lwt.t =
   let (_, nenv, tyenv) = envs in
   let evaluate_inner f =
     let (program, t), (nenv', tyenv'), external_files = parse_fun (nenv, tyenv) f in
-
-    let valenv, v = process_program interacting envs program external_files in
-    {
-    result_env = (valenv,
-      Env.String.extend nenv nenv',
-      Types.extend_typing_environment tyenv tyenv');
-    result_value = v;
-    result_type = t
-    }
+    process_program interacting envs program external_files >>= fun (valenv, v) ->
+    Lwt.return
+      {
+      result_env = (valenv,
+        Env.String.extend nenv nenv',
+        Types.extend_typing_environment tyenv tyenv');
+      result_value = v;
+      result_type = t
+      }
   in
   let evaluate_inner f = lazy (evaluate_inner f) |>measure_as<| "evaluate" in
   handle_errors interacting evaluate_inner filename
@@ -86,7 +81,7 @@ module NonInteractive =
 struct
 
 
-  let run_file prelude envs filename : evaluation_result =
+  let run_file prelude envs filename : evaluation_result Lwt.t =
     Webserver.set_prelude prelude;
     let parse_and_desugar (nenv, tyenv) filename =
       let source =
@@ -117,8 +112,6 @@ struct
       ((globals @ locals, main), t), (nenv, tyenv), []
     in
       evaluate false parse_and_desugar envs v
-
-
 
   (* TODO: Remove special handling of prelude once module processing is in place *)
   let load_prelude () =

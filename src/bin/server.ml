@@ -45,12 +45,12 @@ let handle_message msg env =
     try
       let timeout = Lwt_unix.sleep 4. in
       Lwt_main.run (Lwt.pick [
-        (Lwt.return (Eval_links.evaluate msg env) >|= fun x ->
+        (Eval_links.evaluate msg env >>= fun x ->
         match x.result_type with
         | `Alias (("Page", _), _) -> let (path, _) =
           Webserver.add_dynamic_route x.result_env x.result_value in
-          Page { page_result = x; page_path = path }
-        | _ -> Expression x);
+          Lwt.return (Page { page_result = x; page_path = path })
+        | _ -> Lwt.return (Expression x));
         (timeout >|= fun () -> Exception (Timeout "Timeout Exception"));])
     with
       | ex -> Exception ex in
