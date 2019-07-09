@@ -35,7 +35,6 @@ class LinksKernel(MetaKernel):
 
     # Called when a cell is run in the notebook
     def do_execute_direct(self, code, silent=False):
-
         self._init_socket()
         code = code.rstrip()
 
@@ -49,13 +48,10 @@ class LinksKernel(MetaKernel):
 
             response = json_str["content"]
 
-            if json_str["response"] == "exception":
-                self.Error(response)
-
-            elif json_str["response"] == "page":
+            if json_str["response"] == "page":
                 response = "<iframe src=\"http://localhost:8080{}\" width=\"900\" height=\"400\"></iframe>".format(response)
 
-            if not json_str["response"] == "exception" and not code[-1] == ';':
+            if not code[-1] == ';':
                 display_content = {
                     'source': 'kernel',
                     'data': {
@@ -63,12 +59,15 @@ class LinksKernel(MetaKernel):
                         'text/html': response
                     }, 'metadata': {}
                 }
-
-                self.send_response(self.iopub_socket, 'display_data', display_content)
+                if json_str["response"] == "exception":
+                    self.Error(response)
+                else:
+                    self.send_response(self.iopub_socket, 'display_data', display_content)
 
         except KeyboardInterrupt as e:
             self.Error("***: KeyboardInterrupt")
             self.do_shutdown(True)
+            #self.clear_output(False)
             self.sock.close()
             self.sock = None
 
