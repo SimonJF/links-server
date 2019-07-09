@@ -40,27 +40,26 @@ let json_to_string json =
   let open Yojson.Basic.Util in
   Yojson.Basic.from_string json |> member "input" |> to_string
 
-let attempt_execution timeout msg env =
-  Lwt_main.run (Lwt.pick [
+let attempt_execution msg env =
+  Lwt.pick [
     (Eval_links.evaluate msg env >>= fun x ->
     match x.result_type with
     | `Alias (("Page", _), _) -> let (path, _) =
       Webserver.add_dynamic_route x.result_env x.result_value in
       Lwt.return (Page { page_result = x; page_path = path })
     | _ -> Lwt.return (Expression x));
-    (timeout >|= fun () -> Exception (Timeout "Program Timed out"));])
+    (Lwt_unix.sleep 4. >>= fun () -> Lwt.return (Exception (Timeout "Program Timed out")));]
 
 let handle_message msg env =
   let out =
-    try
-      let timeout = Lwt_unix.sleep 4. in
-      attempt_execution timeout msg env
-    with
-      | ex -> Exception ex in
-  match out with
+    Lwt.catch
+      (fun () -> attempt_execution msg env)
+      (fun e -> Lwt.return (Exception e)) in
+  out >>= fun x ->
+  match x with
     | Expression ex ->
-      ((jsonify out), ex.result_env)
-    | _ -> ((jsonify out), env)
+      Lwt.return ((jsonify x), ex.result_env)
+    | _ -> Lwt.return ((jsonify x), env)
 
 let rec handle_connection ic oc env () =
   let read = Lwt_io.read_line_opt ic in (* Type: Lwt.t (string option)  *)
@@ -71,8 +70,9 @@ let rec handle_connection ic oc env () =
       match msg with
       | Some json ->
         let msg = json_to_string json in
-          let reply, new_env = handle_message msg env in
-          write reply >>= handle_connection ic oc new_env
+          let reply = handle_message msg env in
+          reply >>= fun (res, new_env) ->
+          write res >>= handle_connection ic oc new_env
       | None -> Logs_lwt.info (fun m -> m "Connection closed") >>= return)
 
 let accept_connection conn =
