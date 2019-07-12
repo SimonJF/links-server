@@ -6,7 +6,7 @@ Links kernel for Jupyter - How to install
 
 2. Install the Links kernel package:
 
-	`pip install links-kernel`
+	`pip install linkskernel`
 
 3. Get Jupyter to recognise the package as a kernel:
 
