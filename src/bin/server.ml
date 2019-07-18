@@ -59,6 +59,7 @@ let handle_message msg env =
   match x with
     | Expression ex ->
       Lwt.return ((jsonify x), ex.result_env)
+    | Page p -> let pr = p.page_result in Lwt.return ((jsonify x), pr.result_env)
     | _ -> Lwt.return ((jsonify x), env)
 
 let rec handle_connection ic oc env () =
