@@ -10,22 +10,17 @@ let (globals, init_envs) = Eval_links.init ()
 
 exception Timeout of string
 
-type page = {
-  page_result : Driver.evaluation_result;
-  page_path : string
-}
-
 (* eval created from result of Eval_links.evaluate *)
 type eval =
-  | Expression of Driver.evaluation_result
+  | Expression of Eval_links.value_result
   | Exception of exn
-  | Page of page
+  | Page of string
 
 let jsonify out =
   match out with
-  | Page p ->
+  | Page path ->
     let response = `Assoc [ ("response", `String "page");
-           ("content", `String p.page_path); ] in
+           ("content", `String path); ] in
   Yojson.to_string response
   | Expression ex ->
     let response = `Assoc [ ("response", `String "expression");
@@ -43,11 +38,10 @@ let json_to_string json =
 let attempt_execution msg env =
   Lwt.pick [
     (Eval_links.evaluate msg env >>= fun x ->
-    match x.result_type with
-    | `Alias (("Page", _), _) -> let (path, _) =
-      Webserver.add_dynamic_route x.result_env x.result_value in
-      Lwt.return (Page { page_result = x; page_path = path })
-    | _ -> Lwt.return (Expression x));
+    match x with
+      | PageResult path->
+          Lwt.return (Page path)
+      | ValueResult x -> Lwt.return (Expression x));
     (Lwt_unix.sleep 4. >>= fun () -> Lwt.return (Exception (Timeout "Program Timed out")));]
 
 let handle_message msg env =
@@ -59,7 +53,7 @@ let handle_message msg env =
   match x with
     | Expression ex ->
       Lwt.return ((jsonify x), ex.result_env)
-    | Page p -> let pr = p.page_result in Lwt.return ((jsonify x), pr.result_env)
+    | Page _ -> Lwt.return ((jsonify x), env)
     | _ -> Lwt.return ((jsonify x), env)
 
 let rec handle_connection ic oc env () =
