@@ -39,6 +39,7 @@ let evaluate str envs : evaluation_result Lwt.t =
    * the dynamic path. Otherwise, we evaluate the computation to a value. *)
   match program_ty with
     | `Alias (("Page", _), _) ->
+        let program = Backend.transform_program false tenv program in
         Lwt.return (PageResult (Webserver.Webserver.add_dynamic_route envs program))
     | _ ->
       Driver.process_program true envs program >>= fun (valenv, v) ->

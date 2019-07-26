@@ -31,6 +31,10 @@ let jsonify out =
              ("content", `String (Errors.format_exception e)); ] in
     Yojson.to_string response
 
+    (*
+let page = "fun foo() { \"hello\" } page <html><h1>{ stringToXml(foo()) }</h1></html>"
+*)
+
 let json_to_string json =
   let open Yojson.Basic.Util in
   Yojson.Basic.from_string json |> member "input" |> to_string
@@ -59,7 +63,8 @@ let handle_message msg env =
 let rec handle_connection ic oc env () =
   let read = Lwt_io.read_line_opt ic in (* Type: Lwt.t (string option)  *)
   let write data = Lwt_io.write_line oc data in
-
+  (* attempt_execution page env >>= fun (Page x) ->
+  Debug.print ("path: " ^ x); *)
   read >>=
   (fun msg ->
       match msg with
